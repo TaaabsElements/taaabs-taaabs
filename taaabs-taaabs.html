@@ -6,17 +6,18 @@
 <script type="text/javascript" src="dependencies/sigma.require.js"></script>
 <script type="text/javascript" src="dependencies/sigma.layout.forceAtlas2.min.js"></script>
 
+<link rel="import" href="../taaabs-themes/taaabs-dark-theme.html">
+
 <dom-module id="taaabs-taaabs">
-
-  <style>
-    :host{
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-  </style>
-
   <template>
+    <style include="taaabs-dark-theme"></style>
+    <style>
+      :host{
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
     <content>
     </content>
   </template>
