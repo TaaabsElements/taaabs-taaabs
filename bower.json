@@ -17,7 +17,8 @@
   "main": "taaabs-taaabs.html",
   "license": "https://github.com/TaaabsElements/taaabs-taaabs/LICENSE",
   "dependencies": {
-    "polymer": "polymer/polymer#^1.0.0"
+    "polymer": "polymer/polymer#^1.0.0",
+    "samotracesjs": "https://github.com/liris-tweak/samotraces.js.git#6b75666"
   },
   "devDependencies": {
     "iron-component-page": "polymerelements/iron-component-page#^1.0.0",
