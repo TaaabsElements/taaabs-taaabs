@@ -3140,7 +3140,7 @@ var Base = function Base(uri, id, label) {
 
 Base.prototype = {
   get: function(id) {},
-  
+
   /**
   	 * Create a stored trace in the KTBS
   	 * @param id {String} ID of the created trace
@@ -3148,8 +3148,9 @@ Base.prototype = {
   	 * @param [origin] {Origin} Origin of the trace
   	 * @param [default_subject] {String} Default subject of the trace
   	 * @param [label] {String} Label of the trace
+     * @param [comment] {String} Comment of the trace
   	 */
-  create_stored_trace: function(id, model, origin, default_subject, label, note) {
+  create_stored_trace: function(id, model, origin, default_subject, label, comment) {
     var new_trace = {
       "@context":	"http://liris.cnrs.fr/silex/2011/ktbs-jsonld-context",
       "@type":	"StoredTrace",
@@ -3159,10 +3160,10 @@ Base.prototype = {
     new_trace.origin = origin || "1970-01-01T00:00:00Z";
     new_trace.default_subject = default_subject || "";
     new_trace.label = label || "";
-    new_trace["http://www.w3.org/2004/02/skos/core#note"] = note || "";
-    
+    new_trace["rdfs:comment"] = comment || "";
+
     var that = this;
-    
+
     return new Promise(function(resolve, reject) {
       var xhr = new XMLHttpRequest();
       xhr.open('POST',that.uri,true);
@@ -3181,11 +3182,64 @@ Base.prototype = {
       xhr.onerror = function() {
         reject(Error('There was a network error.'));
       };
-      
+
       xhr.send( JSON.stringify(new_trace) );
-    });  
+    });
   },
-  
+
+  iter_bases: function(){
+    function IterablePromise(arrayLike, process) {
+      var that = this;
+      var lst = [];
+      var i = 0;
+      that.forEach = function(callback) {
+        if (i >= arrayLike.length) {
+          return Promise.resolve(lst);
+        } else {
+          return Promise.resolve(arrayLike[i++])
+          .then(process)
+          .then(function(x) { lst.push(x); return x; })
+          .then(callback)
+          .then(that.forEach.bind(that, callback))
+          ;
+        }
+      };
+      that.then = function(onFullfilled, onRejected) {
+        return that.forEach(function(){}).then(onFullfilled, onRejected);
+      };
+      that.catch = function(onRejected) {
+        return that.forEach(function(){}).catch(onRejected);
+      };
+    }
+
+    function createBaseResource( baseUri ){
+      return new Samotraces.Ktbs.Base( baseUri, null, 'Base' );
+    }
+
+    var bases_uri = [];
+    for(var j = 0 ; j < this.contains.length; j++){
+      if( this.contains[j]['@type'] === 'Base' )
+        bases_uri.push( this.getAbsoluteURLFromRelative( this.uri, this.contains[j]['@id']) );
+    }
+
+    return new IterablePromise(bases_uri, createBaseResource);
+
+  },
+
+  list_bases: function(){
+    var that = this;
+    return new Promise( function(resolve, reject){
+      that.iter_stored_traces()
+          .then( function(x){
+            resolve(x);
+          })
+          .catch( function(err){
+            reject(err);
+          })
+    });
+  },
+
+
   iter_stored_traces: function(){
     function IterablePromise(arrayLike, process) {
       var that = this;
@@ -3210,21 +3264,21 @@ Base.prototype = {
         return that.forEach(function(){}).catch(onRejected);
       };
     }
-    
+
     function createBaseResource( traceUri ){
       return new Samotraces.Ktbs.Trace( traceUri, null, 'StoredTrace' );
     }
-    
+
     var traces_uri = [];
     for(var j = 0 ; j < this.contains.length; j++){
       if( this.contains[j]['@type'] === 'StoredTrace' )
         traces_uri.push( this.getAbsoluteURLFromRelative( this.uri, this.contains[j]['@id']) );
     }
-    
+
     return new IterablePromise(traces_uri, createBaseResource);
-    
+
   },
-  
+
   list_stored_traces: function(){
     var that = this;
     return new Promise( function(resolve, reject){
@@ -3237,7 +3291,7 @@ Base.prototype = {
           })
     });
   },
-  
+
   iter_computed_traces: function(){
     function IterablePromise(arrayLike, process) {
       var that = this;
@@ -3262,21 +3316,21 @@ Base.prototype = {
         return that.forEach(function(){}).catch(onRejected);
       };
     }
-    
+
     function createBaseResource( traceUri ){
       return new Samotraces.Ktbs.Trace( traceUri, null, 'ComputedTrace' );
     }
-    
+
     var traces_uri = [];
     for(var j = 0 ; j < this.contains.length; j++){
       if( this.contains[j]['@type'] === 'ComputedTrace' )
         traces_uri.push( this.getAbsoluteURLFromRelative( this.uri, this.contains[j]['@id']) );
     }
-    
+
     return new IterablePromise(traces_uri, createBaseResource);
-    
+
   },
-  
+
   list_computed_traces: function(){
     var that = this;
     return new Promise( function(resolve, reject){
@@ -3289,7 +3343,7 @@ Base.prototype = {
           })
     });
   },
-  
+
   iter_models: function(){
     function IterablePromise(arrayLike, process) {
       var that = this;
@@ -3314,21 +3368,21 @@ Base.prototype = {
         return that.forEach(function(){}).catch(onRejected);
       };
     }
-    
+
     function createBaseResource( traceUri ){
       return new Samotraces.Ktbs.Model( traceUri, null );
     }
-    
+
     var traces_uri = [];
     for(var j = 0 ; j < this.contains.length; j++){
       if( this.contains[j]['@type'] === 'TraceModel' )
         traces_uri.push( this.getAbsoluteURLFromRelative( this.uri, this.contains[j]['@id']) );
     }
-    
+
     return new IterablePromise(traces_uri, createBaseResource);
-    
+
   },
-  
+
   list_models: function(){
     var that = this;
     return new Promise( function(resolve, reject){
@@ -3341,11 +3395,11 @@ Base.prototype = {
           })
     });
   },
-  
+
   /**
   * Change the attributes of the Base. Add or change the attributes passed in parameter.
   * Example of attributes :
-  * attributes = [ [attributes_name_1,attribute_value_1], [attribute_name_2,attribute_value_2], ...]; 
+  * attributes = [ [attributes_name_1,attribute_value_1], [attribute_name_2,attribute_value_2], ...];
   *
   * Returns a Promise with the base as a parameter if the modification succeed.
   * @param attributes {Array} Array of Array, with the name of the attribute in the 1st position, the value of the parameter in the 2nd position.
@@ -3362,10 +3416,10 @@ Base.prototype = {
 
           // Pour le inRoot qui bug
           if(old_attributes['inRoot'] && old_attributes['inRoot'] === '..' )
-            old_attributes['inRoot'] = '../'; 
+            old_attributes['inRoot'] = '../';
 
           var modeldata = JSON.stringify(old_attributes);
-          
+
           var etag = that.etag;
           var xhr = new XMLHttpRequest();
           xhr.open('PUT', that.uri, true);
@@ -3376,7 +3430,7 @@ Base.prototype = {
             if (xhr.readyState === 4) {
               if(xhr.status === 200) {
                 that.etag = xhr.getResponseHeader('ETag');
-                that._on_state_refresh_( JSON.parse( xhr.response ) ); 
+                that._on_state_refresh_( JSON.parse( xhr.response ) );
                 resolve( xhr.response );
               } else {
                 reject(xhr);
@@ -3392,21 +3446,21 @@ Base.prototype = {
           console.log(err);
         })
       } );
-  },  
+  },
 
   /**
-  * Create a TraceModel in the KTBS. 
+  * Create a TraceModel in the KTBS.
   * Returns a Promise, with the created TraceModel as a parameter.
   * @param id {String} ID of the created TraceModel.
   * @param [label] {String} Label of the TraceModel.
   */
-  create_model: function(id, label, note, unit) {
+  create_model: function(id, label, comment, unit) {
     var doc = {
       '@context': 'http://liris.cnrs.fr/silex/2011/ktbs-jsonld-context',
       '@graph': [{
         '@id': id,
         'label':label || '',
-        'http://www.w3.org/2004/02/skos/core#note' : note || "",
+        'rdfs:comment' : comment || "",
         '@type': 'TraceModel',
         'inBase': './',
         'hasUnit': unit || 'millisecond'
@@ -3414,7 +3468,7 @@ Base.prototype = {
     };
     var that = this;
     return new Promise(function(resolve, reject) {
-      
+
       var xhr = new XMLHttpRequest();
       xhr.open('POST',that.uri,true);
       xhr.setRequestHeader('Content-Type', 'application/json');
@@ -3432,7 +3486,7 @@ Base.prototype = {
       xhr.onerror = function() {
         reject(Error('There was a network error.'));
       };
-      
+
       xhr.send( JSON.stringify(doc) );
     });
   },
@@ -3459,7 +3513,8 @@ Base.prototype = {
   _on_state_refresh_: function(data) {
     //	console.log(data);
     this._check_change_('label', data["label"], 'base:update');
-    this._check_change_('http://www.w3.org/2004/02/skos/core#note', data["http://www.w3.org/2004/02/skos/core#note"], 'base:update');
+    var comment = data["http://www.w3.org/2000/01/rdf-schema#comment"] || "";
+    this._check_change_('comment', comment, 'base:update');
     this._check_change_('contains', data.contains, 'base:update');
     this._check_change_('attributes', data, 'base:attrSet');
   },
@@ -3735,7 +3790,7 @@ function get_etag() { return this.etag; }
     /**
   	 * @summary Forces the Resource to synchronise with the KTBS.
   	 * @memberof Samotraces.KTBS.Resource.prototype
-     * @param {Object} options 
+     * @param {Object} options
      *  'options._on_state_refresh_': true|false
      *   enable or disable the old behavior of calling _on_state_refresh_ on the resource after synchronise completes
   	 * @description
@@ -3744,9 +3799,9 @@ function get_etag() { return this.etag; }
   	 * trigger the _on_state_refresh_ method of the Resource
   	 * on success.
   	 */
-  /*  
+  /*
   function force_state_refresh(options, success, reject) {
-    
+
     success = success || function () {};
     reject = reject || function () {};
     options = options || {'_on_state_refresh_': true}; // For backward compatibility
@@ -3792,17 +3847,17 @@ function get_etag() { return this.etag; }
     });
   }
   */
-  
+
   function load( timeout ){
     var that = this;
     var delay = timeout || 15000;
     this.loading_promise = this.loading_promise || new Promise(function(resolve, reject) {
-      
+
       setTimeout(function() {
         that.loading_promise = null;
         reject("Promise timed-out after " + delay + "ms");
       }, delay);
-      
+
       var xhr = new XMLHttpRequest();
       xhr.open('GET',that.uri,true);
       xhr.setRequestHeader('Content-Type', 'application/json');
@@ -3815,6 +3870,38 @@ function get_etag() { return this.etag; }
             try {
               response = JSON.parse(xhr.response);
               that.etag = xhr.getResponseHeader('ETag');
+              if(!that._on_state_refresh_){
+                if(response['@type'] === null || response['@type'] === undefined ){
+                  for(var i = 0;  i < response["@graph"].length; i++){
+                    if( response["@graph"][i]["@type"] === "TraceModel" ){
+                      var model = new Samotraces.Ktbs.Model(response["@graph"][i]['@id']);
+                      model._on_state_refresh_(response);
+                      that.loading_promise = null;
+                      resolve(model);
+                    }
+                  }
+                }
+                switch(response['@type']){
+                  case 'Base':
+                    var base = new Samotraces.Ktbs.Base(response['@id']);
+                    base._on_state_refresh_(response);
+                    that.loading_promise = null;
+                    resolve(base);
+                  break;
+                  case 'StoredTrace':
+                    var trace = new Samotraces.Ktbs.Trace(response['@id'],response['@id'],'StoredTrace');
+                    trace._on_state_refresh_(response);
+                    that.loading_promise = null;
+                    resolve(trace);
+                  break;
+                  case 'ComputedTrace':
+                    var trace = new Samotraces.Ktbs.Trace(response['@id'],response['@id'],'ComputedTrace');
+                    trace._on_state_refresh_(response);
+                    that.loading_promise = null;
+                    resolve(trace);
+                  break;
+                }
+              }
               that._on_state_refresh_(response);
               that.loading_promise = null;
               resolve(that);
@@ -3822,8 +3909,8 @@ function get_etag() { return this.etag; }
             catch (e) {
                reject(Error('This resource has some errors on server side.'));
             }
-            
-            
+
+
           }
           else if(xhr.status === 304){
             that.loading_promise = null;
@@ -3841,10 +3928,10 @@ function get_etag() { return this.etag; }
       };
       xhr.send();
     });
-    
+
     return this.loading_promise;
   }
-  
+
     /**
   	 * @summary Forces the Resource to synchronise
   	 * with at a given refreshing rate.
@@ -3941,11 +4028,11 @@ function get_etag() { return this.etag; }
     this.label = label || "";
     this.type = type || "";
     this.etag = "";
-    
-    
+
+
     this.loading_promise = null;
-    
-    
+
+
     // API METHODS
     this.get_id = get_id;
     this.get_uri = get_uri;
@@ -3961,7 +4048,7 @@ function get_etag() { return this.etag; }
     this._check_change_ = _check_change_;
     this.start_auto_refresh = start_auto_refresh;
     this.stop_auto_refresh = stop_auto_refresh;
-    this.getAbsoluteURLFromRelative=getAbsoluteURLFromRelative;
+    this.getAbsoluteURLFromRelative = getAbsoluteURLFromRelative;
     return this;
   };
 })();
