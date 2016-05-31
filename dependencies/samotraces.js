@@ -3136,6 +3136,7 @@ var Base = function Base(uri, id, label) {
   KTBSResource.call(this, id, uri, 'Base', label);
   this.contains = [];
   this.attributes = {};
+  this._propertiesPromise = null
 };
 
 Base.prototype = {
@@ -3239,6 +3240,62 @@ Base.prototype = {
     });
   },
 
+  load_properties: function(props, timeout){
+    var that = this;
+    var delay = timeout || 15000;
+
+
+    var targetURI = that.uri+'?prop=';
+
+    for(var i = 0; i < props.length; i++){
+      targetURI += props[i] ;
+      if( i < props.length - 1 )
+        targetURI += ","
+    }
+
+    if( !this._propertiesPromise ){
+      this._propertiesPromise = new Promise(function(resolve, reject) {
+
+        setTimeout(function() {
+          that._propertiesPromise = null;
+          reject("Promise timed-out after " + delay + "ms");
+        }, delay);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET',targetURI,true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Accept', 'application/ld+json');
+        xhr.withCredentials = true;
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4) {
+            if(xhr.status === 200) {
+              var response = undefined
+              try {
+                response = JSON.parse(xhr.response);
+                that.etag = xhr.getResponseHeader('ETag');
+                that._propertiesPromise = null;
+                resolve(response.contains);
+              }
+              catch (e) {
+                that._propertiesPromise = null;
+                reject(Error('This resource has some errors on server side.'));
+              }
+            }
+            else {
+              that._propertiesPromise = null;
+              reject(xhr);
+            }
+          }
+        };
+        xhr.onerror = function() {
+          that._propertiesPromise = null;
+          reject(Error('There was a network error.'));
+        };
+        xhr.send();
+      });
+    }
+    return this._propertiesPromise;
+  },
 
   iter_stored_traces: function(){
     function IterablePromise(arrayLike, process) {
@@ -3477,6 +3534,46 @@ Base.prototype = {
         if (xhr.readyState === 4) {
           if(xhr.status === 200 || xhr.status === 201) {
             resolve( new Samotraces.Ktbs.Model( xhr.response.replace('>','').replace('<',''), null, 'TraceModel' ) );
+          }
+          else {
+            reject(xhr);
+          }
+        }
+      };
+      xhr.onerror = function() {
+        reject(Error('There was a network error.'));
+      };
+
+      xhr.send( JSON.stringify(doc) );
+    });
+  },
+
+  /**
+  * Create a BAse in this base ("Baseception").
+  * Returns a Promise, with the created Base as a parameter.
+  * @param id {String} ID of the created Base.
+  * @param {!optionnal} label {String} Label of the Base.
+  * @param {!optionnal} comment {String} Label of the Base.
+  */
+  create_base: function(id, label, comment) {
+    var doc = {
+      "@id": id + '/',
+      "@type": "Base",
+      "inBase": "./",
+      "label": label || "",
+      "http://www.w3.org/2000/01/rdf-schema#comment": comment || ""
+    };
+    var that = this;
+    return new Promise(function(resolve, reject) {
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST',that.uri,true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.withCredentials = true;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if(xhr.status === 200 || xhr.status === 201) {
+            resolve( new Samotraces.Ktbs.Base( xhr.response.replace('>','').replace('<','') ) );
           }
           else {
             reject(xhr);
@@ -3972,18 +4069,26 @@ function get_etag() { return this.etag; }
   	 *     WHEN A RESOURCE IS DELETED.
   	 */
   function remove() {
-    function refresh_parent() {
-      //TROUVER UN MOYEN MALIN DE RAFRAICHIR LA LISTE DES BASES DU KTBS...
-    }
-    $.ajax({
-      url: this.uri,
-      type: 'DELETE',
-      success: refresh_parent.bind(this),
-      error: function(jqXHR, textStatus, errorThrown) {
-        throw "Cannot delete " + this.get_resource_type() + " " + this.uri + ": " + textStatus + ' ' + JSON.stringify(errorThrown);
-      }
+
+    var that = this;
+    return new Promise(function(resolve, reject) {
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('DELETE', that.uri, true);
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.withCredentials = true;
+      xhr.onerror = function() {
+        reject( "Cannot delete " + that.get_resource_type() + " " + that.uri + ": " + xhr.status );
+      };
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          resolve( xhr.response );
+        }
+      };
+      xhr.send(null);
     });
-  }
+
+    }
   /**
   	 * @summary Returns the label of the Resource
   	 */
@@ -4024,7 +4129,7 @@ function get_etag() { return this.etag; }
     // DOCUMENTED ABOVE
     // ATTRIBUTES
     this.id = id;
-    this.uri = uri;
+    this.uri = uri || id;
     this.label = label || "";
     this.type = type || "";
     this.etag = "";
@@ -4785,7 +4890,7 @@ var KTBS = function KTBS(uri) {
   KTBSResource.call(this, uri, uri, 'KTBS', "");
   this.bases = [];
   this.builtin_methods = [];
-  
+
   var that = this;
 };
 
@@ -4799,7 +4904,7 @@ KTBS.prototype = {
   * @todo METHOD NOT IMPLEMENTED
 */
   get_builtin_method: function() {},
-  
+
   /**
   * @summary Returns the KTBS.Base with the given ID.
   * @returns Samotraces.KTBS.Base Base corresponding to the given ID
@@ -4836,18 +4941,18 @@ KTBS.prototype = {
     });
   },
   */
-  
-  
+
+
   create_base: function(id, label, note){
-    
+
     var new_base = {
       "@context":	"http://liris.cnrs.fr/silex/2011/ktbs-jsonld-context",
       "@type":	"Base",
       "@id":		id + "/",
       "label":	label || "",
-      "http://www.w3.org/2004/02/skos/core#note" : note || ""
+      "http://www.w3.org/2000/01/rdf-schema#comment" : note || ""
     }
-    
+
     var url = this.uri;
     return new Promise( function(resolve, reject){
       var xhr = new XMLHttpRequest();
@@ -4866,12 +4971,12 @@ KTBS.prototype = {
       xhr.onerror = function() {
         reject(Error('There was a network error.'));
       };
-      
+
       xhr.send( JSON.stringify(new_base) );
     })
-    
+
   },
-  
+
   iter_bases: function(){
     function IterablePromise(arrayLike, process) {
       var that = this;
@@ -4896,20 +5001,20 @@ KTBS.prototype = {
         return that.forEach(function(){}).catch(onRejected);
       };
     }
-    
+
     function createBaseResource( baseUri ){
       return new Samotraces.Ktbs.Base( baseUri );
     }
-    
+
     var bases_uri = [];
     for(var j = 0 ; j < this.bases.length; j++){
       bases_uri.push( this.uri + this.bases[j] );
     }
-    
+
     return new IterablePromise(bases_uri, createBaseResource);
-    
+
   },
-  
+
   list_bases: function(){
     var that = this;
     return new Promise( function(resolve, reject){
@@ -4922,8 +5027,8 @@ KTBS.prototype = {
           })
     });
   },
-  
-  
+
+
   ///////////
   /**
   * Overloads the {@link Samotraces.KTBS.Resouce#_on_state_refresh_} method.
