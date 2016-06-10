@@ -3660,12 +3660,13 @@ var Model = function(uri, id, label) {
   id = id || uri;
   KTBSResource.call(this, id, uri, 'TraceModel', label || "");
   this.list_type_obsels = [];
+  this.list_type_attributes = [];
   base_uri = "";
 };
 
 Model.prototype = {
 
-  
+
   list_obsels: function(data) {
     ListeObselType = [];
     var M = this;
@@ -3738,7 +3739,7 @@ Model.prototype = {
       '@context': 'http://liris.cnrs.fr/silex/2011/ktbs-jsonld-context',
       '@graph': input
     }
-    
+
     return new Promise(function(resolve, reject) {
       var etag = that.etag;
       var xhr = new XMLHttpRequest();
@@ -3769,14 +3770,26 @@ Model.prototype = {
 
     this._check_change_('list_type_obsels', data["@graph"], 'model:update');
 
+    var type_obsels = [];
+    var type_attributes = [];
+
     for(var i = 0;  i < data["@graph"].length; i++){
       if( data["@graph"][i]["@type"] === "TraceModel" ){
         this._check_change_('base_uri', this.getAbsoluteURLFromRelative(this.uri, data["@graph"][i].inBase), 'model:update');
         this._check_change_('@id', data["@graph"][i]["@id"], 'model:update');
         this._check_change_('label', data["@graph"][i]["label"], 'model:update');
-        this._check_change_('http://www.w3.org/2004/02/skos/core#note', data["@graph"][i]["http://www.w3.org/2004/02/skos/core#note"], 'model:update');
+        this._check_change_('http://www.w3.org/2000/01/rdf-schema#comment', data["@graph"][i]["http://www.w3.org/2000/01/rdf-schema#comment"], 'model:update');
+      }
+      else if( data["@graph"][i]["@type"] === "ObselType" ){
+        type_obsels.push(data["@graph"][i]);
+      }
+      else if( data["@graph"][i]["@type"] === "AttributeType" ){
+        type_attributes.push(data["@graph"][i]);
       }
     }
+
+    this._check_change_('list_type_attributes',type_attributes, 'model:update');
+    this._check_change_('list_type_obsels', type_obsels, 'model:update');
 
   }
 
