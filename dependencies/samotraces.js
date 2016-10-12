@@ -3443,9 +3443,13 @@ Base.prototype = {
   list_models: function(){
     var that = this;
     return new Promise( function(resolve, reject){
+      var result = [];
       that.iter_stored_traces()
           .then( function(x){
-            resolve(x);
+            if(x)
+              result.push(x);
+            else
+              resolve(result);
           })
           .catch( function(err){
             reject(err);
@@ -3661,6 +3665,8 @@ var Model = function(uri, id, label) {
   KTBSResource.call(this, id, uri, 'TraceModel', label || "");
   this.list_type_obsels = [];
   this.list_type_attributes = [];
+  this.model_properties = {};
+  this.graph = [];
   base_uri = "";
 };
 
@@ -3779,6 +3785,7 @@ Model.prototype = {
         this._check_change_('@id', data["@graph"][i]["@id"], 'model:update');
         this._check_change_('label', data["@graph"][i]["label"], 'model:update');
         this._check_change_('http://www.w3.org/2000/01/rdf-schema#comment', data["@graph"][i]["http://www.w3.org/2000/01/rdf-schema#comment"], 'model:update');
+        this._check_change_('model_properties', data["@graph"][i]);
       }
       else if( data["@graph"][i]["@type"] === "ObselType" ){
         type_obsels.push(data["@graph"][i]);
@@ -3790,6 +3797,8 @@ Model.prototype = {
 
     this._check_change_('list_type_attributes',type_attributes, 'model:update');
     this._check_change_('list_type_obsels', type_obsels, 'model:update');
+
+    this._check_change_('graph', data["@graph"], 'model:update');
 
   }
 
@@ -3959,6 +3968,7 @@ function get_etag() { return this.etag; }
   */
 
   function load( timeout ){
+
     var that = this;
     var delay = timeout || 15000;
     this.loading_promise = this.loading_promise || new Promise(function(resolve, reject) {
@@ -3974,6 +3984,7 @@ function get_etag() { return this.etag; }
       xhr.setRequestHeader('Accept', 'application/ld+json');
       xhr.withCredentials = true;
       xhr.onreadystatechange = function () {
+
         if (xhr.readyState === 4) {
           if(xhr.status === 200) {
             var response = undefined
@@ -4036,6 +4047,7 @@ function get_etag() { return this.etag; }
         that.loading_promise = null;
         reject(Error('There was a network error.'));
       };
+
       xhr.send();
     });
 
