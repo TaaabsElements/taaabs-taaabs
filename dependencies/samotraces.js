@@ -3799,7 +3799,7 @@ Model.prototype = {
           if(xhr.status === 200) {
             that.etag = xhr.getResponseHeader('ETag');
             that._on_state_refresh_(JSON.parse(xhr.response));
-            resolve();
+            resolve(this);
           } else {
             reject(xhr);
           }
@@ -3810,6 +3810,54 @@ Model.prototype = {
       };
       xhr.send(JSON.stringify(modeldata));
     });
+  },
+
+  addStylesheet: function(stylesheet){
+    var prop_uri = 'http://www.example.com/TODO#ModelStylesheets';
+    return new Promise(function(resolve, reject) {
+      // First we load the model, to get the last version.
+      this.load().then(function(){
+        var styleIndex = -1;
+        // We check if there's already some stylesheet
+        if(this.graph[0][prop_uri] === undefined || this.graph[0][prop_uri] === null){
+          this.graph[0][prop_uri] = [];
+        }
+        // If there's already some stylesheet, we have to check if there is ONE or more stylesheet.
+        // If there's one, we need to transform the string into an Array.
+        else{
+          if(this.graph[0][prop_uri].constructor !== Array){
+            this.graph[0][prop_uri] = [this.graph[0][prop_uri]];
+          }
+          for(var i = 0; i < this.graph[0][prop_uri].length; i++){
+            var ms = JSON.parse(this.graph[0][prop_uri][i]);
+            if(ms['name'] === stylesheet.name){
+              styleIndex = i;
+              i = this.graph[0][prop_uri].length;
+            }
+          }
+        }
+        if(styleIndex > -1){
+            var ms = JSON.parse(this.graph[0][prop_uri][styleIndex]);
+            ms.description = stylesheet.description;
+            ms.rules = stylesheet.rules;
+            this.graph[0][prop_uri][styleIndex] = JSON.stringify(ms);
+        }
+        else{
+          this.graph[0][prop_uri].push(JSON.stringify({
+            'name': stylesheet.name,
+            'description': stylesheet.description,
+            'rules': stylesheet.rules
+          }));
+        }
+        this.put_model(this.graph).then(function(model){
+          resolve(model);
+        }).catch(function(err){
+          reject(err);
+        })
+      }.bind(this)).catch(function(error){
+        reject(error);
+      }.bind(this));
+    }.bind(this));
   },
 
   _on_state_refresh_: function(data) {
@@ -3842,7 +3890,6 @@ Model.prototype = {
 
     this._check_change_('list_type_attributes',type_attributes, 'model:update');
     this._check_change_('list_type_obsels', type_obsels, 'model:update');
-
     this._check_change_('graph', data["@graph"], 'model:update');
 
   }

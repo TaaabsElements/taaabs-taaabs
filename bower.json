@@ -17,7 +17,7 @@
   "main": "taaabs-taaabs.html",
   "license": "https://github.com/TaaabsElements/taaabs-taaabs/LICENSE",
   "dependencies": {
-    "polymer": "polymer/polymer#^1.0.0"
+    "polymer": "polymer/polymer"
   },
   "devDependencies": {
     "iron-component-page": "polymerelements/iron-component-page#^1.0.0",
