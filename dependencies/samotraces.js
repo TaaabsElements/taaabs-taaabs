@@ -3645,7 +3645,48 @@ Base.prototype = {
   /**
   	 * @todo METHOD NOT IMPLEMENTED
   	 */
-  create_method: function(id, parent, parameters, label) {},
+  create_method: function(id, parent, parameters, label) {
+    var query = {
+      "@id": id,
+      "@type": "Method",
+      "label": label,
+      "hasParentMethod": parent,
+      "parameter": parameters
+    }
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', this.uri, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Accept', 'application/ld+json');
+      xhr.withCredentials = true;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if(xhr.status === 200 || xhr.status === 201) {
+            try {
+              var response = xhr.response;
+              try {
+                response = JSON.parse(xhr.response);
+              } catch (e) {}
+              resolve(response);
+            } catch (e) {
+              resolve( xhr.response );
+            } finally {
+              resolve( xhr.response );
+            }
+          }
+          else {
+            reject(xhr);
+          }
+        }
+      };
+      xhr.onerror = function() {
+        reject(Error('There was a network error.'));
+      };
+      var string_query = JSON.stringify(query);
+      console.log(string_query);
+      xhr.send(string_query);
+    }.bind(this));
+  },
   ///////////
   /**
   	 * Overloads the {@link Samotraces.KTBS.Resouce#_on_state_refresh_} method.
