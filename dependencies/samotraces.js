@@ -3601,11 +3601,11 @@ Base.prototype = {
     var query = {
       "@id": id,
       "@type": "ComputedTrace",
-      "label": label,
+      "label": label || "",
       "hasMethod": method,
       "hasSource": sources,
-      "parameter": parameters
-    }
+      "parameter": parameters || []
+    };
     return new Promise(function(resolve, reject) {
       var xhr = new XMLHttpRequest();
       xhr.open('POST', this.uri, true);
@@ -4112,7 +4112,7 @@ function get_etag() { return this.etag; }
 
   function load( timeout ){
     var that = this;
-    var delay = timeout || 15000;
+    var delay = timeout || 600000;
     this.loading_promise = this.loading_promise || new Promise(function(resolve, reject) {
 
       setTimeout(function() {
